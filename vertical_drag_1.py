@@ -79,6 +79,29 @@ class RangeDrag(Frame):
             self.cidmotion = self.rect1.figure.canvas.mpl_connect(
                 'motion_notify_event', lambda event: self.on_motion(event))
 
+        def on_motion(self, event):
+            self.motion(event)
+
+        def motion(self, event):
+            'on motion we will move the rect if the mouse is over us'
+            if self.lock is not self:
+                return
+            if event.inaxes != self.rect1.axes: return
+            x0, y0, xpress, ypress = self.press
+            dx = event.xdata - xpress
+
+            self.rect1.set_x(self.l10+dx)
+
+            canvas = self.rect1.figure.canvas
+            axes = self.rect1.axes
+
+            # restore the background region
+            canvas.restore_region(self.background)
+            axes.draw_artist(self.rect1)
+            canvas.blit(axes.bbox)
+
+            self.inf.config(text = round(self.rect1.get_xy()[0] + self.rect1.get_width()/2, 2), fg = 'red', font= ('courier', 16))
+
         def on_press(self, event):
             'on button press we will see if the mouse is over us and store some data'
             if event.inaxes != self.rect1.axes: return
@@ -108,30 +131,7 @@ class RangeDrag(Frame):
 
             # and blit just the redrawn area
             canvas.blit(axes.bbox)
-
-        def on_motion(self, event):
-            self.motion(event)
-
-        def motion(self, event):
-            'on motion we will move the rect if the mouse is over us'
-            if self.lock is not self:
-                return
-            if event.inaxes != self.rect1.axes: return
-            x0, y0, xpress, ypress = self.press
-            dx = event.xdata - xpress
-
-            self.rect1.set_x(self.l10+dx)
-
-            canvas = self.rect1.figure.canvas
-            axes = self.rect1.axes
-
-            # restore the background region
-            canvas.restore_region(self.background)
-            axes.draw_artist(self.rect1)
-            canvas.blit(axes.bbox)
-
-            self.inf.config(text = round(self.rect1.get_xy()[0] + self.rect1.get_width()/2, 2), fg = 'red', font= ('courier', 16))
-
+            
         def on_release(self, event):
             'on release we reset the press data'
             if self.lock is not self:
