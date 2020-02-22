@@ -48,40 +48,7 @@ class SDC_analysis_main(Frame):
         self.plotLines = []
         # self.data
 
-    def on_import(self):
-        # path = r'C:\Users\Yu\Dropbox\PythonProgram\SDC_analysis\data\20191122-4580_v5_No2_Ag-Ir-Pd-Pt-Ru_LSV_pH13\20191122-4580_v5_No2_Ag-Ir-Pd-Pt-Ru_LSV_pH13'
-        # data_type = 'LSV2.dat'
-        filenames = filedialog.askopenfilenames(title = "choose a SDC project",filetypes = (("select LSV1 files", "*LSV1.dat"), ("select LSV2 files", "*LSV2.dat"), ("select files", "*.dat"),("all files","*.*")))
-        if len(filenames) == 0:
-            return
-        filenames = self.tk.splitlist(filenames) #Possible workaround
 
-        self.data = defaultdict(dict)
-        # for i, file in enumerate(glob.glob(os.path.join(path,f'*{data_type}'))):
-        xx, yy = [], []
-        for i, file in enumerate(filenames):
-            x, y = [ float(n)/1000 for n in os.path.basename(file).split('.x')[0:2]] #coordinates
-            xx.append(x)
-            yy.append(y)
-            d = pd.read_csv(file, skiprows = [i for i in range(17)], header = None)
-            self.data[x][y] = (d.iloc[:, 2], d.iloc[:, 3]) # (x, y) = (potential, ma)
-        self.wafer.x, self.wafer.y = np.array(xx), np.array(yy)
-        #draw wafer coordinate
-        self.wafer.ax.scatter(self.wafer.x, self.wafer.y, marker = 's', linewidths = 2, color = 'blue')# plot all imported coords
-        self.wafer.format_ax()
-
-        #override button
-        self.wafer.b_clear.config(command = self._on_clear)
-        self.wafer.canvas.mpl_disconnect(self.wafer.cid1)
-        #override the self.wafer interactive methods
-        self.wafer.canvas.mpl_connect('button_press_event', self.on_click)
-
-        self.wafer.canvas.draw()
-
-        if self.b_project.cget('state') == 'normal':
-            self.b_project.config(state = 'disabled')
-            self.bImport.config(state = 'disabled')
-        messagebox.showinfo(title = None, message = f'total {len(filenames)} files imported')
 
     def on_import_project(self):
         filename = filedialog.askopenfilename(title = "choose a SDC project",filetypes = (("SDC analysis project","*.SDC"),("all files","*.*")))
