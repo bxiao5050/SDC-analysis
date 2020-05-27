@@ -72,6 +72,14 @@ class SDC_analysis_main(Frame):
             self.b_project.config(state = 'disabled')
             self.bImport.config(state = 'disabled')
 
+    def on_curve_overview(self):
+        w = Toplevel()
+        w.title('overview for all the curves')
+        if self.plot_canvas is None:
+            Curve_overview(w, self.data, self.wafer.ax, None)
+        else:
+            Curve_overview(w, self.data, self.wafer.ax, self.plot_canvas.get_Xrange_Value())
+
     def on_show_heatmap_project(self, etitle, potential0, mA, current_N, mA_all, x_range):
         w = Toplevel()
         w.title('SDC result')
@@ -85,13 +93,6 @@ class SDC_analysis_main(Frame):
         wafer_clicked = self.wafer.get_clicked()
         heatmap.set_project( wafer_clicked, x_range)
 
-    def on_curve_overview(self):
-        w = Toplevel()
-        w.title('overview for all the curves')
-        if self.plot_canvas is None:
-            Curve_overview(w, self.data, self.wafer.ax, None)
-        else:
-            Curve_overview(w, self.data, self.wafer.ax, self.plot_canvas.get_Xrange_Value())
 
 
     def line_select_callback(self, eclick, erelease):
@@ -136,7 +137,13 @@ class SDC_analysis_main(Frame):
                 self.plotLines.append(line)
         self.plot_canvas.ax.legend().set_draggable(True)
         self.plot_canvas.canvas.draw()
-
+        
+    def on_click(self, event):
+        if event.inaxes!=self.wafer.ax: return
+        if self.b_project.cget('state') == 'normal':
+            self.b_project.config(state = 'disabled')
+        self.wafer.on_click(event)
+        self.plot_selected()
 
     def on_export_selections(self):
         df = pd.DataFrame()
