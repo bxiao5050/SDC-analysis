@@ -68,7 +68,36 @@ class RangeDrag(Frame):
             self.ax = ax
             self.press = None
             self.background = None
+            
+        def on_press(self, event):
+            'on button press we will see if the mouse is over us and store some data'
+            if event.inaxes != self.rect1.axes: return
+            if self.lock is not None: return
+            contains, attrd = self.rect1.contains(event)
+            if not contains: return
 
+            # if self.ismiddle == True:
+            self.vline.remove()
+            self.l10 = self.rect1.xy[0]
+            # self.l20 = self.rect2.xy[1]
+
+            x0, y0 = self.rect1.xy
+            self.press = x0, y0, event.xdata, event.ydata
+            self.lock = self
+
+            # draw everything but the selected rectangle and store the pixel buffer
+            canvas = self.rect1.figure.canvas
+            axes = self.rect1.axes
+            self.rect1.set_animated(True)
+
+            canvas.draw()
+            self.background = canvas.copy_from_bbox(self.rect1.axes.bbox)
+
+            # now redraw just the rectangle
+            axes.draw_artist(self.rect1)
+
+            # and blit just the redrawn area
+            canvas.blit(axes.bbox)
         def connect(self):
             'connect to all the events we need'
 
