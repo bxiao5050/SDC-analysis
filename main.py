@@ -106,6 +106,28 @@ class SDC_analysis_main(Frame):
         self.wafer.on_click(event)
         self.plot_selected()
 
+    def _on_show(self):
+        scatter = []
+        potential0 = self.plot_canvas.rangedrag.get_vline_value()
+
+        for x, v in self.data.items():
+            for y in v.keys():
+                potential, mA = self.data[x][y]
+                mA0 = np.round(mA[np.abs(potential - potential0).idxmin], 3) # get nearest y value
+                scatter.append((x,y,mA0))
+
+        x1 = [x for x, y, c in scatter]
+        y1 = [y for x, y, c in scatter]
+        c1 = [c for x, y, c in scatter]
+
+        w = Toplevel()
+        w.title('SDC result')
+
+        heatmap = Result_heatmap(w, x = x1, y = y1, c=c1, potential0 = round(potential0,3), data = self.data, xrange_Value = self.plot_canvas.get_Xrange_Value())
+        wafer_clicked = self.wafer.get_clicked()
+        x_range = self.plot_canvas.get_Xrange_Value()
+        heatmap.set_project(wafer_clicked, x_range)
+
 
     def _on_clear(self):
         self.wafer._on_clear() #clear wafer
@@ -137,25 +159,13 @@ class SDC_analysis_main(Frame):
                 self.plotLines.append(line)
         self.plot_canvas.ax.legend().set_draggable(True)
         self.plot_canvas.canvas.draw()
-        
+
     def on_click(self, event):
         if event.inaxes!=self.wafer.ax: return
         if self.b_project.cget('state') == 'normal':
             self.b_project.config(state = 'disabled')
         self.wafer.on_click(event)
         self.plot_selected()
-
-    def on_export_selections(self):
-        df = pd.DataFrame()
-        for x, y in self.wafer.get_clicked():
-            if (x in self.data )and (y in self.data[x]):
-                potential, mA = self.data[x][y]
-                df.insert(len(df.columns), 'potential'+ f"({x}, {y})", potential)
-                df.insert(len(df.columns), 'mA' + f"({x}, {y})", mA)
-        filename = filedialog.asksaveasfilename(title = "Select file",filetypes = (("csv files","*.csv"),("all files","*.*")))
-        df.to_csv(filename + '.csv', index = False)
-        if len(filename) > 0:
-            messagebox.showinfo(title = None, message = 'file saved!')
 
 
     def on_show_heatmap(self):
