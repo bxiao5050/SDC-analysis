@@ -68,7 +68,17 @@ class RangeDrag(Frame):
             self.ax = ax
             self.press = None
             self.background = None
-            
+
+        def connect(self):
+            'connect to all the events we need'
+
+            self.cidpress = self.rect1.figure.canvas.mpl_connect(
+                'button_press_event', lambda event: self.on_press(event))
+            self.cidrelease = self.rect1.figure.canvas.mpl_connect(
+                'button_release_event', lambda event: self.on_release(event))
+            self.cidmotion = self.rect1.figure.canvas.mpl_connect(
+                'motion_notify_event', lambda event: self.on_motion(event))
+
         def on_press(self, event):
             'on button press we will see if the mouse is over us and store some data'
             if event.inaxes != self.rect1.axes: return
@@ -98,15 +108,6 @@ class RangeDrag(Frame):
 
             # and blit just the redrawn area
             canvas.blit(axes.bbox)
-        def connect(self):
-            'connect to all the events we need'
-
-            self.cidpress = self.rect1.figure.canvas.mpl_connect(
-                'button_press_event', lambda event: self.on_press(event))
-            self.cidrelease = self.rect1.figure.canvas.mpl_connect(
-                'button_release_event', lambda event: self.on_release(event))
-            self.cidmotion = self.rect1.figure.canvas.mpl_connect(
-                'motion_notify_event', lambda event: self.on_motion(event))
 
         def on_motion(self, event):
             self.motion(event)
@@ -131,36 +132,6 @@ class RangeDrag(Frame):
 
             self.inf.config(text = round(self.rect1.get_xy()[0] + self.rect1.get_width()/2, 2), fg = 'red', font= ('courier', 16))
 
-        def on_press(self, event):
-            'on button press we will see if the mouse is over us and store some data'
-            if event.inaxes != self.rect1.axes: return
-            if self.lock is not None: return
-            contains, attrd = self.rect1.contains(event)
-            if not contains: return
-
-            # if self.ismiddle == True:
-            self.vline.remove()
-            self.l10 = self.rect1.xy[0]
-            # self.l20 = self.rect2.xy[1]
-
-            x0, y0 = self.rect1.xy
-            self.press = x0, y0, event.xdata, event.ydata
-            self.lock = self
-
-            # draw everything but the selected rectangle and store the pixel buffer
-            canvas = self.rect1.figure.canvas
-            axes = self.rect1.axes
-            self.rect1.set_animated(True)
-
-            canvas.draw()
-            self.background = canvas.copy_from_bbox(self.rect1.axes.bbox)
-
-            # now redraw just the rectangle
-            axes.draw_artist(self.rect1)
-
-            # and blit just the redrawn area
-            canvas.blit(axes.bbox)
-            
         def on_release(self, event):
             'on release we reset the press data'
             if self.lock is not self:

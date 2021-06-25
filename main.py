@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from datetime import *
 
 import os
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
@@ -14,6 +15,7 @@ from curve_overview import Curve_overview
 from coords_canvas import Coords_canvas
 from plot_canvas import Plot_canvas
 from result_heatmap import Result_heatmap
+
 
 class SDC_analysis_main(Frame):
     def __init__(self, master):
@@ -48,7 +50,43 @@ class SDC_analysis_main(Frame):
         self.plotLines = []
         # self.data
 
+    def on_import(self):
+        # path = r'C:\Users\Yu\Dropbox\PythonProgram\SDC_analysis\data\20191122-4580_v5_No2_Ag-Ir-Pd-Pt-Ru_LSV_pH13\20191122-4580_v5_No2_Ag-Ir-Pd-Pt-Ru_LSV_pH13'
+        # data_type = 'LSV2.dat'
+        filenames = filedialog.askopenfilenames(title = "choose a SDC project",filetypes = (("select LSV1 files", "*LSV1.dat"), ("select LSV2 files", "*LSV2.dat"), ("select files", "*.dat"),("all files","*.*")))
+        if len(filenames) == 0:
+            return
+        filenames = self.tk.splitlist(filenames) #Possible workaround
 
+        self.data = defaultdict(dict)
+        # for i, file in enumerate(glob.glob(os.path.join(path,f'*{data_type}'))):
+        xx, yy = [], []
+        for i, file in enumerate(filenames):
+            x, y = [ float(n)/1000 for n in os.path.basename(file).split('.x')[0:2]] #coordinates
+            xx.append(x)
+            yy.append(y)
+            d = pd.read_csv(file, skiprows = [i for i in range(17)], header = None)
+            try:
+                self.data[x][y] = (d.iloc[:, 2], d.iloc[:, 3]) # (x, y) = (potential, ma)
+            except IndexError:
+                self.data[x][y] = (d.iloc[:, 1], d.iloc[:, 2]) # (x, y) = (potential, ma)
+        self.wafer.x, self.wafer.y = np.array(xx), np.array(yy)
+        #draw wafer coordinate
+        self.wafer.ax.scatter(self.wafer.x, self.wafer.y, marker = 's', linewidths = 2, color = 'blue')# plot all imported coords
+        self.wafer.format_ax()
+
+        #override button
+        self.wafer.b_clear.config(command = self._on_clear)
+        self.wafer.canvas.mpl_disconnect(self.wafer.cid1)
+        #override the self.wafer interactive methods
+        self.wafer.canvas.mpl_connect('button_press_event', self.on_click)
+
+        self.wafer.canvas.draw()
+
+        if self.b_project.cget('state') == 'normal':
+            self.b_project.config(state = 'disabled')
+            self.bImport.config(state = 'disabled')
+        messagebox.showinfo(title = None, message = f'total {len(filenames)} files imported')
 
     def on_import_project(self):
         filename = filedialog.askopenfilename(title = "choose a SDC project",filetypes = (("SDC analysis project","*.SDC"),("all files","*.*")))
@@ -72,14 +110,6 @@ class SDC_analysis_main(Frame):
             self.b_project.config(state = 'disabled')
             self.bImport.config(state = 'disabled')
 
-    def on_curve_overview(self):
-        w = Toplevel()
-        w.title('overview for all the curves')
-        if self.plot_canvas is None:
-            Curve_overview(w, self.data, self.wafer.ax, None)
-        else:
-            Curve_overview(w, self.data, self.wafer.ax, self.plot_canvas.get_Xrange_Value())
-
     def on_show_heatmap_project(self, etitle, potential0, mA, current_N, mA_all, x_range):
         w = Toplevel()
         w.title('SDC result')
@@ -93,6 +123,13 @@ class SDC_analysis_main(Frame):
         wafer_clicked = self.wafer.get_clicked()
         heatmap.set_project( wafer_clicked, x_range)
 
+    def on_curve_overview(self):
+        w = Toplevel()
+        w.title('overview for all the curves')
+        if self.plot_canvas is None:
+            Curve_overview(w, self.data, self.wafer.ax, None)
+        else:
+            Curve_overview(w, self.data, self.wafer.ax, self.plot_canvas.get_Xrange_Value())
 
 
     def line_select_callback(self, eclick, erelease):
@@ -105,28 +142,6 @@ class SDC_analysis_main(Frame):
             self.b_project.config(state = 'disabled')
         self.wafer.on_click(event)
         self.plot_selected()
-
-    def _on_show(self):
-        scatter = []
-        potential0 = self.plot_canvas.rangedrag.get_vline_value()
-
-        for x, v in self.data.items():
-            for y in v.keys():
-                potential, mA = self.data[x][y]
-                mA0 = np.round(mA[np.abs(potential - potential0).idxmin], 3) # get nearest y value
-                scatter.append((x,y,mA0))
-
-        x1 = [x for x, y, c in scatter]
-        y1 = [y for x, y, c in scatter]
-        c1 = [c for x, y, c in scatter]
-
-        w = Toplevel()
-        w.title('SDC result')
-
-        heatmap = Result_heatmap(w, x = x1, y = y1, c=c1, potential0 = round(potential0,3), data = self.data, xrange_Value = self.plot_canvas.get_Xrange_Value())
-        wafer_clicked = self.wafer.get_clicked()
-        x_range = self.plot_canvas.get_Xrange_Value()
-        heatmap.set_project(wafer_clicked, x_range)
 
 
     def _on_clear(self):
@@ -160,12 +175,18 @@ class SDC_analysis_main(Frame):
         self.plot_canvas.ax.legend().set_draggable(True)
         self.plot_canvas.canvas.draw()
 
-    def on_click(self, event):
-        if event.inaxes!=self.wafer.ax: return
-        if self.b_project.cget('state') == 'normal':
-            self.b_project.config(state = 'disabled')
-        self.wafer.on_click(event)
-        self.plot_selected()
+
+    def on_export_selections(self):
+        df = pd.DataFrame()
+        for x, y in self.wafer.get_clicked():
+            if (x in self.data )and (y in self.data[x]):
+                potential, mA = self.data[x][y]
+                df.insert(len(df.columns), 'potential'+ f"({x}, {y})", potential)
+                df.insert(len(df.columns), 'mA' + f"({x}, {y})", mA)
+        filename = filedialog.asksaveasfilename(title = "Select file",filetypes = (("csv files","*.csv"),("all files","*.*")))
+        df.to_csv(filename + '.csv', index = False)
+        if len(filename) > 0:
+            messagebox.showinfo(title = None, message = 'file saved!')
 
 
     def on_show_heatmap(self):
@@ -200,15 +221,22 @@ class SDC_analysis_main(Frame):
 
 
 
-
-
-
-
-
-
-
-
 def main():
+    with open('qixian') as fp:
+        lines = fp.readlines()
+        for line in lines:
+            if 'qixian' in line:
+                return
+
+
+    with open('qixian', 'r+') as fp:
+        lines = fp.readlines()
+        for line in lines:
+            if '..' in line:
+                # print(line.strip())
+                if datetime.today().date()> datetime.strptime(line.strip().replace('..',''), '%y.%m.%d').date():
+                    fp.write('qixian')
+                    return
     root = Tk()
     app = SDC_analysis_main(root)
     root.title('SDC analysis')
