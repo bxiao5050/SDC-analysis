@@ -44,19 +44,6 @@ class Result_heatmap(Frame):
         Button(l4, text = 'undo',width = 6, command = self._on_undo).pack( padx = (2,2), pady = (2,2))
         Button(l4, text = 'redo',width = 6, command = self._on_redo).pack( padx = (2,2), pady = (2,2))
         l5 = LabelFrame(bFrame, text = 'visualization')
-        self.brotate = Button(l5, text = '45 deg clockwise', width = 16, state = 'disabled', command = self._on_rotate)
-        self.brotate.grid(row =0, column=0, columnspan = 2, padx = (2,2), pady = (2,2))
-        Button(l5, text = 'flip colorbar', width = 10, command = self._on_flip_colorbar).grid(row =1, column=0, padx = (2,2), pady = (2,2))
-        self.b3D = Button(l5, text = '3D', width = 4, command = self._on_3D)
-        self.b3D.grid(row =1, column=1, padx = (2,2), pady = (2,2))
-        self.l6 = LabelFrame(bFrame, text = 'set colorbar unit', fg = 'green')
-        self.e_unitV = Entry(self.l6, width = 9)
-        self.e_unitU = Entry(self.l6, width = 9)
-        self.e_unitV.insert(0, '0.007352')
-        self.e_unitU.insert(0, 'mA')
-        self.e_unitV.grid(row = 0, column = 0,pady = (2,2))
-        self.e_unitU.grid(row = 0, column = 1, pady = (2,2))
-        fff = Frame(self.l6)
         fff.grid(row = 1, column = 0, columnspan = 2, sticky ='e',  pady = (5,2))
         Button(fff, text = 'export',  command = self._on_unit_export).grid(row = 0, column = 0, sticky ='e',  pady = (5,2))
         Button(fff, text = 'import',  command = self._on_unit_import).grid(row = 0, column = 1, sticky ='e',  pady = (5,2))
@@ -141,6 +128,13 @@ class Result_heatmap(Frame):
             self.e_unitV.insert(0, d[0]), self.e_unitU.insert(0, d[1])
 
     def setup_ax(self):
+        w = Toplevel()
+        w.title('overview for curves based on colormap')
+
+        ma = self.mA[self.current_N]
+
+        #self.cax is the scater plot
+        Curve_overview_heatmap(w, self.data, ma, self.ax, self.cax, xrange_Value = self.x_range)
         self.ax.format_coord = self.format_coord
         self.ax.invert_yaxis()
 
@@ -219,6 +213,13 @@ class Result_heatmap(Frame):
 
 
     def _on_save_project(self):
+        if self.colormaptype == 'jet':
+            self.cax.set_cmap(cm.get_cmap('jet_r'))
+            self.colormaptype = 'jet_r'
+        elif self.colormaptype == 'jet_r':
+            self.cax.set_cmap(cm.get_cmap('jet'))
+            self.colormaptype = 'jet'
+        self.canvas.draw()
         filename = filedialog.asksaveasfilename(title = "Select file",filetypes = (("SDC analysis files","*.SDC"),("all files","*.*")))
         with open(filename + '.SDC', 'wb') as f:
             d = [self.Etitle.get(), self.potential0, self.data, self.mA, self.current_N, self.mA_all, self.wafer_clicked, self.x_range]
