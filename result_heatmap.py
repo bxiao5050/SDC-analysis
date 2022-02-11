@@ -7,25 +7,33 @@ from tkinter import *
 from matplotlib.figure import Figure
 from matplotlib.widgets import RectangleSelector
 from matplotlib import cm
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox,  Scale
+from tkinter.ttk import Combobox
 import pandas as pd
 from tkinter import filedialog, messagebox
 import pickle
 from mpl_toolkits.mplot3d import axes3d
 
-from showHist import ShowHist
+from showHist_SDC import ShowHist_SDC
 from curve_overview_heatmap import Curve_overview_heatmap
+from publication_SDC import Publication_SDC
 
 class Result_heatmap(Frame):
     def __init__(self, master, x = None, y = None, c = None, potential0 = None, data= None, xrange_Value = None ):
         super().__init__(master)
         self.pack()
+        self.sc_potential_var = DoubleVar()
+        self.sc_potential_var.set(potential0)
+        potential_range, xx = data[0][0] #get potential range
+
         bFrame = Frame(self) #buttons frame
         cFrame = Frame(self) #canvas frame
+        scFrame = LabelFrame(self, text = 'change potential', fg='violet red')
         titleF = Frame(self)
 
         bFrame.pack()
         cFrame.pack()
+        scFrame.pack()
         titleF.pack()
 
         l1 = LabelFrame(bFrame, text = 'select')
@@ -44,20 +52,47 @@ class Result_heatmap(Frame):
         Button(l4, text = 'undo',width = 6, command = self._on_undo).pack( padx = (2,2), pady = (2,2))
         Button(l4, text = 'redo',width = 6, command = self._on_redo).pack( padx = (2,2), pady = (2,2))
         l5 = LabelFrame(bFrame, text = 'visualization')
+        self.brotate = Button(l5, text = '45 deg clockwise', width = 16, state = 'disabled', command = self._on_rotate)
+        self.brotate.grid(row =0, column=0, columnspan = 2, padx = (2,2), pady = (2,2))
+        Button(l5, text = 'flip colorbar', width = 10, command = self._on_flip_colorbar).grid(row =1, column=0, padx = (2,2), pady = (2,2))
+        self.b3D = Button(l5, text = '3D', width = 4, command = self._on_3D)
+        self.b3D.grid(row =1, column=1, padx = (2,2), pady = (2,2))
+        lf51 = LabelFrame(l5, text = 'choose color', fg = 'blue')
+        lf51.grid(row =2, column=0, columnspan = 2)
+        self.cb_color = Combobox(lf51, values = ['jet','rainbow','viridis', 'Greys', 'Reds', 'Blues', 'Purples', 'Greens'])
+        self.cb_color.pack()
+        self.cb_color.current(0)
+        self.cb_color.bind('<<ComboboxSelected>>', self.on_colorchange)
+
+        self.l6 = LabelFrame(bFrame, text = 'set colorbar unit', fg = 'green')
+        self.e_unitV = Entry(self.l6, width = 9)
+        self.e_unitU = Entry(self.l6, width = 9)
+        self.e_unitV.insert(0, '0.007352')
+        self.e_unitU.insert(0, 'mA')
+        self.e_unitV.grid(row = 0, column = 0,pady = (2,2))
+        self.e_unitU.grid(row = 0, column = 1, pady = (2,2))
+        fff = Frame(self.l6)
         fff.grid(row = 1, column = 0, columnspan = 2, sticky ='e',  pady = (5,2))
         Button(fff, text = 'export',  command = self._on_unit_export).grid(row = 0, column = 0, sticky ='e',  pady = (5,2))
         Button(fff, text = 'import',  command = self._on_unit_import).grid(row = 0, column = 1, sticky ='e',  pady = (5,2))
         Button(fff, text = 'set', command = self._on_unit).grid(row = 0, column = 2,sticky ='e',  pady = (5,2))
 
-        l1.pack(side = 'left', padx = (2,2))
-        l2.pack(side = 'left', padx = (2,2))
-        l3.pack(side = 'left', padx = (2,2))
-        l4.pack(side = 'left', padx = (2,2))
-        l5.pack(side = 'left', padx = (2,2))
-        self.l6.pack(side = 'right')
+        sc_potential = Scale(scFrame,from_ =min(potential_range), to = max(potential_range), orient = 'horizontal', command = self._on_potential_scale, variable = self.sc_potential_var, length = 550, resolution = 0.2 )
+        sc_potential.pack()
+
+        l7 = LabelFrame(bFrame, text = 'fig setting')
+        Button(l7, text = 'publication', command = self.on_fig_publication).pack()
+
+        l1.pack(side = 'left', padx = (2,2), anchor = 'n')
+        l2.pack(side = 'left', padx = (2,2), anchor = 'n')
+        l4.pack(side = 'left', padx = (2,2), anchor = 'n')
+        l5.pack(side = 'left', padx = (2,2), anchor = 'n')
+        self.l6.pack(side = 'right', anchor = 'n')
 
         self.Etitle = Entry(titleF, text = ' ', fg = 'blue', width = 50, font = ('courier', 14, 'bold'))
         self.Etitle.pack(pady = (10,0))
+        l7.pack(side = 'left', padx = (2,2), anchor = 'n')
+        l3.pack(side = 'left', padx = (2,2), anchor = 'n')
 
         self.width = 4
 
@@ -73,7 +108,7 @@ class Result_heatmap(Frame):
 
         self.cbar = None #colarbar for corlormap
 
-        self.colormaptype = 'jet' #'jet' or 'jet_r'
+        self.colormaptype = self.cb_color.get() #'jet' or 'jet_r'
         self.deg_rotate = 0
         self.potential0 = potential0
         self.data = data
@@ -99,6 +134,32 @@ class Result_heatmap(Frame):
         if x is not None:
             self.plot_scatter()
 
+    def on_fig_publication(self):
+        w = Toplevel()
+
+        ma = self.mA[self.current_N]
+        c = np.array([ma[(x,y)] for x,y in ma])
+        x = np.array([x for x, y in ma])
+        y = np.array([y for x, y in ma])
+
+        fig = Figure(figsize=(7.5, 6), dpi = 100)
+        ax = fig.add_subplot(111)
+
+        cax=ax.scatter(x, y, c = c, s = 140, cmap = 'jet', marker = 's')
+        cbar=fig.colorbar(cax, ticks = np.linspace(min(c), max(c), num = 9))
+
+        cbar.ax.set_title('mA')
+        # ax.set_title('\t')
+
+        app = Publication_SDC(w,  c, ax,fig, cbar, cax)
+        app.pack(fill = 'both', expand =1)
+
+
+
+    def on_colorchange(self, e):
+        self.cax.set_cmap(cm.get_cmap(self.cb_color.get()))
+        self.colormaptype = self.cb_color.get()
+        self.canvas.draw()
 
     def _on_plot_overview(self):
         w = Toplevel()
@@ -128,13 +189,6 @@ class Result_heatmap(Frame):
             self.e_unitV.insert(0, d[0]), self.e_unitU.insert(0, d[1])
 
     def setup_ax(self):
-        w = Toplevel()
-        w.title('overview for curves based on colormap')
-
-        ma = self.mA[self.current_N]
-
-        #self.cax is the scater plot
-        Curve_overview_heatmap(w, self.data, ma, self.ax, self.cax, xrange_Value = self.x_range)
         self.ax.format_coord = self.format_coord
         self.ax.invert_yaxis()
 
@@ -162,12 +216,12 @@ class Result_heatmap(Frame):
 
     def _on_flip_colorbar(self):
         # print(dir(self.cax))
-        if self.colormaptype == 'jet':
-            self.cax.set_cmap(cm.get_cmap('jet_r'))
-            self.colormaptype = 'jet_r'
-        elif self.colormaptype == 'jet_r':
-            self.cax.set_cmap(cm.get_cmap('jet'))
-            self.colormaptype = 'jet'
+        if '_r' not in self.colormaptype :
+            self.cax.set_cmap(cm.get_cmap(self.colormaptype+'_r'))
+            self.colormaptype = self.colormaptype+'_r'
+        elif '_r' in self.colormaptype :
+            self.cax.set_cmap(cm.get_cmap(self.colormaptype.replace('_r', '')))
+            self.colormaptype = self.colormaptype.replace('_r', '')
         self.canvas.draw()
 
     def _on_rotate(self):
@@ -213,13 +267,6 @@ class Result_heatmap(Frame):
 
 
     def _on_save_project(self):
-        if self.colormaptype == 'jet':
-            self.cax.set_cmap(cm.get_cmap('jet_r'))
-            self.colormaptype = 'jet_r'
-        elif self.colormaptype == 'jet_r':
-            self.cax.set_cmap(cm.get_cmap('jet'))
-            self.colormaptype = 'jet'
-        self.canvas.draw()
         filename = filedialog.asksaveasfilename(title = "Select file",filetypes = (("SDC analysis files","*.SDC"),("all files","*.*")))
         with open(filename + '.SDC', 'wb') as f:
             d = [self.Etitle.get(), self.potential0, self.data, self.mA, self.current_N, self.mA_all, self.wafer_clicked, self.x_range]
@@ -234,7 +281,7 @@ class Result_heatmap(Frame):
 
     def _on_distribution(self):
         w = Toplevel()
-        hist = ShowHist(w)
+        hist = ShowHist_SDC(w)
         hist.pack()
         ma = self.mA[self.current_N]
         hist.update([ma[(x,y)] for x, y in ma])
@@ -373,6 +420,35 @@ class Result_heatmap(Frame):
 
         self.plot_scatter() #redraw scatter
 
+    # change potential, only change potential, don't change x, y
+    def _on_potential_scale(self, e):
+        scatter = []
+        potential0 = float(self.sc_potential_var.get())
+        self.potential0 = potential0
+        for x, v in self.data.items():
+            for y in v.keys():
+                potential, mA = self.data[x][y]
+                mA0 = np.round(mA[np.abs(potential - potential0).idxmin], 3) # get nearest y value
+                scatter.append((x,y,mA0))
+
+        x1 = [x for x, y, c in scatter]
+        y1 = [y for x, y, c in scatter]
+        c1 = [c for x, y, c in scatter]
+
+        ma = self.mA[self.current_N]
+        # if x is not None:
+        for xx, yy, cc in zip(x1, y1, c1):
+            if (xx, yy) in ma:
+                ma[(xx,yy)] = cc
+            self.mA_all[(xx,yy)] = cc #update
+        # self.mA.append(ma) #version n = 0
+
+
+
+        self.plot_scatter(is_title = True)
+
+
+
 
     def plot_scatter(self, is_title = True):
         for line in self.plot_clicked:
@@ -385,8 +461,8 @@ class Result_heatmap(Frame):
 
         ma = self.mA[self.current_N]
         c = np.array([ma[(x,y)] for x,y in ma])
-        self.cax = self.ax.scatter(np.array([x for x, y in ma]), np.array([y for x, y in ma]), c = c, s = 100, marker = 's', cmap = cm.jet)
-        self.colormaptype = 'jet'
+        self.cax = self.ax.scatter(np.array([x for x, y in ma]), np.array([y for x, y in ma]), c = c, s = 100, marker = 's', cmap = self.cb_color.get())
+        self.colormaptype = self.cb_color.get()
 
         x_d, y_d = [], [] # record current deleted x, y
         for (xx, yy) in self.mA_all:
